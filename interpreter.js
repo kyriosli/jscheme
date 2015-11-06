@@ -1,3 +1,5 @@
+#!/bin/env node
+
 function run(code) {
     var global = {
         "+": function (ret) {

@@ -1,3 +1,5 @@
+#!/bin/env node
+
 var types = {
     S_PROGRAM: 's_program',
     S_LIST: 's_list',
