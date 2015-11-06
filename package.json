@@ -1,0 +1,29 @@
+{
+  "name": "jscheme",
+  "version": "1.0.0",
+  "description": "JavaScript Scheme parser/compiler/interpreter",
+  "main": "interpreter.js",
+  "directories": {
+    "test": "test"
+  },
+  "bin": {
+    "jscmc": "compiler.js",
+    "jscm": "interpreter.js"
+  },
+  "scripts": {
+    "test": "node test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kyriosli/jscheme.git"
+  },
+  "keywords": [
+    "Scheme"
+  ],
+  "author": "kyriosli",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kyriosli/jscheme/issues"
+  },
+  "homepage": "https://github.com/kyriosli/jscheme#readme"
+}
