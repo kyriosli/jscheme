@@ -15,6 +15,9 @@ var assert = require('assert');
 exports.generate = function (ast) {
     var debug = false;
     var globals = {
+        'global': '_',
+        'this': '_',
+        '.': '.',
         '+': '+',
         '-': '-',
         '*': '*',
@@ -48,7 +51,7 @@ exports.generate = function (ast) {
             // save
             var oldVars = variables, argc;
             scopes.push(currentScope);
-            currentScope = {__proto__: currentScope};
+            currentScope = {__proto__: currentScope, 'this': '$'};
             variables = 0;
 
             if (argNames.type === types.IDENTIFIER) { // (lambda arguments)
@@ -101,7 +104,34 @@ exports.generate = function (ast) {
             if (arguments.length < 3 || arguments.length > 4)
                 throw 'ill-formed if: one or two arguments is expected' + expr.pos;
             var cond1 = onExpr(t), cond2 = arguments.length === 4 ? onExpr(f) : 'u';
-            return '?' + onExpr(cond) + ch(cond1.length + 3) + cond1 + 'z' + ch(cond2.length + 1) + cond2;
+            return '?' + onExpr(cond) + ch(cond1.length + 3) + cond1 + 'k' + ch(cond2.length + 1) + cond2;
+        },
+        'call': function (expr, target, callee) {
+            if (arguments.length < 3)
+                throw 'ill-formed call: callee and target is expected' + expr.pos;
+
+            var argc = arguments.length - 3;
+            var ret = 'a' + onExpr(target) + onExpr(callee) + ch(argc);
+            for (var i = 0; i < argc; i++) {
+                ret += onExpr(arguments[3 + i]);
+            }
+            return ret;
+        },
+        'invoke': function (expr, target, method) {
+            if (arguments.length < 3)
+                throw 'ill-formed call: target and method is expected' + expr.pos;
+
+            var argc = arguments.length - 3;
+            var ret = 'i' + onExpr(target) + onExpr(method) + ch(argc);
+            for (var i = 0; i < argc; i++) {
+                ret += onExpr(arguments[3 + i]);
+            }
+            return ret;
+        },
+        'method': function (expr, lambda) {
+            if (arguments.length !== 2)
+                throw 'ill-formed method: one argument is expected' + expr.pos;
+            return 'm' + onExpr(lambda)
         }
     };
 
@@ -135,6 +165,10 @@ exports.generate = function (ast) {
                     while (!curr.hasOwnProperty(name)) curr = scopes[--n];
                     //console.log('name %s is variable %s in scope %d', name, curr[name], n);
                     return 'v' + ch(n) + curr[name]
+                } else if (name === 'undefined') {
+                    return 'u'
+                } else if (name === 'null') {
+                    return 'z'
                 } else {
                     throw 'unbound variable: ' + name + expr.pos
                 }
@@ -155,7 +189,7 @@ exports.generate = function (ast) {
         for (var expr of exprs) {
             ret += onExpr(expr);
         }
-        if (/^c2v0[+\-*/&^%|=<>]/.test(ret)) {// shorthand
+        if (/^c2v0[+\-*/&^%|=<>.]/.test(ret)) {// shorthand
             ret = '%' + ret.substr(4)
         }
         return ret;

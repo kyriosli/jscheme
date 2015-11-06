@@ -2,11 +2,14 @@
 $  string
 c  call
 d  (define name val)
+
+i  (invoke method target ...args)
+k  skip
 l  (lambda (names) val)
+m  method
 n  number
 r  (set! name)
 s  (set! name val)
 t  (trace val)
 u  undefined
 v  variable
-z  skip

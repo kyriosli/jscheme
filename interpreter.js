@@ -2,6 +2,7 @@
 
 function run(code) {
     var global = {
+        _: this,
         "+": function (ret) {
             ret = +ret;
             for (var i = 1; i < arguments.length; i++)
@@ -20,6 +21,10 @@ function run(code) {
         }, '/': function (ret) {
             for (var i = 1; i < arguments.length; i++)
                 ret /= arguments[i]
+            return ret;
+        }, '.': function (ret) {
+            for (var i = 1; i < arguments.length; i++)
+                ret = ret[arguments[i]]
             return ret;
         }
     };
@@ -57,8 +62,9 @@ function run(code) {
             var ins = code.charCodeAt(pc++), ret;
             //console.log('ins[' + exprs + ']: ' + code[pc - 1] + ' pc=' + pc);
             switch (ins) {
+                case 36: // string
+                    return code.substring(pc + 1, pc += num() + 1);
                 case 37: // binary
-
                     return binaries[code[pc++]](onexpr(), onexpr());
                 case 63: // ?
                     if (onexpr()) {
@@ -82,12 +88,7 @@ function run(code) {
                         //console.log('>>> BEGIN call lambda', callee, args);
 
                         if (!multiple || exprs || scope.callee !== callee) {
-                            var newScope = {
-                                __proto__: callee.scope,
-                                depth: callee.depth,
-                                callee: callee
-                            };
-                            newScope['$' + newScope.depth] = newScope;
+                            var newScope = mkScope(callee);
                         } else { // scope reuse
                             //console.log('scope reused', tailPC);
                             newScope = scope;
@@ -119,6 +120,19 @@ function run(code) {
                     scope[name] = onexpr();
                     //console.log('set', name, scope[name]);
                     return "'" + name;
+                case 105: // invoke
+                    var target = onexpr(), callee = onexpr();
+                    argc = num();
+                    args = [];
+                    for (i = 0; i < argc; i++) {
+                        args[i] = onexpr();
+                    }
+                    return callee.apply(target, args);
+                    break;
+                case 107: // skip
+                    exprs++;
+                    pc += num();
+                    break;
                 case 108: // lambda
                     var codeLen = num();
                     return {
@@ -128,6 +142,9 @@ function run(code) {
                         scope: scope,
                         depth: scope.depth + 1
                     };
+                case 109: // method
+                    return method(onexpr());
+                    break;
                 //console.log('lambda', ret, pc, exprs);
                 case 110: // number
                     var len = num();
@@ -157,9 +174,8 @@ function run(code) {
                 case 118: // variable
                     //console.log('variable %d:%s', code[pc], code[pc + 1]);
                     return scope['$' + num()][code[pc++]];
-                case 122: // skip
-                    exprs++;
-                    pc += num();
+                case 122: // z
+                    return null
             }
         }
 
@@ -167,6 +183,26 @@ function run(code) {
             return code.charCodeAt(pc++) - 48
         }
 
+    }
+
+    function method(lambda) {
+        return function () {
+            var scope = mkScope(lambda);
+            scope.$ = this;
+            for (var i = 0; i < lambda.argc; i++) {
+                scope[i] = arguments[i];
+            }
+            return runner(lambda.code, 0, scope, lambda.exprs)
+        };
+    }
+
+    function mkScope(lambda) {
+        var scope = {
+            __proto__: lambda.scope,
+            depth: lambda.depth,
+            callee: lambda
+        };
+        return scope['$' + scope.depth] = scope;
     }
 
 }
