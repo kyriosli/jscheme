@@ -6,15 +6,16 @@ var compiler = require('../compiler'),
     interpreter = require('../interpreter');
 
 var starts = {};
-var uptime = require('os').uptime;
+var hrtime = process.hrtime;
 var time = function (label) {
-    starts[label] = uptime();
+    starts[label] = hrtime();
 };
 
 var timeEnd = function (label) {
-    var diff = uptime() - starts[label];
+    var now = hrtime(), old = starts[label];
     if (delete starts[label]) {
-        console.log('\x1b[32m%s\x1b[0m: %dms %d', label, Math.round(diff * 1e6) / 1000)
+        var diff = (now[0] - old[0]) * 1e6 + (now[1] - old[1]) / 1e3;
+        console.log('\x1b[32m%s\x1b[0m: %dms', label, Math.round(diff) / 1e3)
     }
 };
 
