@@ -8,8 +8,11 @@ k  skip
 l  (lambda (names) val)
 m  method
 n  number
+o  integer
 r  (set! name)
 s  (set! name val)
 t  (trace val)
 u  undefined
 v  variable
+
+A-Z: -1~24

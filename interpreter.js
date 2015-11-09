@@ -56,15 +56,16 @@ function run(code) {
         }
         return ret;
 
-
         function onexpr(multiple) {
-            var ins = code.charCodeAt(pc++), val, len, ret, args, callee, i;
+            var val, len, ret, arg, callee, i;
             //console.log('ins[' + exprs + ']: ' + code[pc - 1] + ' pc=' + pc);
-            switch (ins) {
+            switch (i = code.charCodeAt(pc++)) {
                 case 36: // string
-                    return code.substring(pc + 1, pc += num() + 1);
+                    return str();
                 case 37: // binary
                     return binaries[code[pc++]](onexpr(), onexpr());
+                //case 43: // +
+                //    return onexpr() + onexpr();
                 case 63: // ?
                     if (i = onexpr()) {
                         pc++;
@@ -83,30 +84,27 @@ function run(code) {
                     return val;
                 case 99: // call
                     callee = onexpr();
-                    args = readList();
+                    arg = readList();
                     if (callee.apply) {
-                        return callee.apply(null, args)
+                        return callee.apply(null, arg)
                     } else { // call lambda
                         //console.log('>>> BEGIN call lambda', callee, args);
-
-                        if (!multiple || exprs || scope.callee !== callee) {
-                            val = mkScope(callee); // new scope
-                        } else { // scope reuse
+                        ret = multiple && !exprs;
+                        if (ret && scope.callee === callee) { // scope reuse
                             //console.log('scope reused', tailPC);
                             val = scope;
-                        }
-                        if (callee.argc === -1) {
-                            val[0] = args;
                         } else {
-                            for (i = 0, len = callee.argc; i < len; i++) {
-                                val[i] = args[i]
+                            val = mkScope(callee); // new scope
+                        }
+                        if ((len = callee.argc) > -1) {
+                            for (i = 0; i < len; i++) {
+                                val[i] = arg[i]
                             }
+                        } else {
+                            val[0] = arg;
                         }
 
-                        if (!multiple || exprs) {
-                            return runner(callee.code, val, callee.exprs);
-                        } else {
-                            // tail call
+                        if (ret) { // tail call
                             //console.log('>>> tail call optimized');
                             code = callee.code;
                             pc = 0;
@@ -114,6 +112,7 @@ function run(code) {
                             scope = val;
                             return
                         }
+                        return runner(callee.code, val, callee.exprs);
                         //console.log('<<< END call lambda', ret);
                     }
                 case 100: // define
@@ -130,37 +129,42 @@ function run(code) {
                     return {
                         argc: num(),
                         exprs: num(),
-                        code: code.substring(pc + 1, pc += num() + 1),
-                        scope: scope,
-                        depth: scope.depth + 1
+                        code: str(),
+                        scope: scope
                     };
                 case 109: // method
                     return method(onexpr());
                 //console.log('lambda', ret, pc, exprs);
                 case 110: // number
-                    return +code.substring(pc + 1, pc += num() + 1);
+                    return +str();
                 case 114: // remove
                 case 115: // set!
                     val = scope['$' + num()]; // scope
-                    i = code[pc++];
+                    arg = code[pc++];
                     ret = val[i];
-                    if (ins & 1) {
-                        val[i] = onexpr();
+                    if (i & 1) {
+                        val[arg] = onexpr();
                     } else {
-                        delete val[i];
+                        delete val[arg];
                     }
                     return ret;
-                case 116: // trace
-                    return console.log('\x1b[36m[trace]\x1b[0m '
-                        + require('util').inspect(onexpr()) + code.substring(pc + 1, pc += num() + 1));
                 case 118: // variable
                     //console.log('variable %d:%s', code[pc], code[pc + 1]);
                     return scope['$' + num()][code[pc++]];
                 case 122: // z
                     return null;
-                //case 117: // undefined
-                //    return;
+                case 116: // trace
+                    return console.log('\x1b[36m[trace]\x1b[0m '
+                        + require('util').inspect(onexpr()) + str());
+                case 117: // undefined
+                    return;
+                default:
+                    return i - 66;
             }
+        }
+
+        function str() {
+            return code.substring(pc + 1, pc += num() + 1)
         }
 
         function readList() {
@@ -188,14 +192,14 @@ function run(code) {
     }
 
     function mkScope(lambda) {
-        var scope = {
-            depth: lambda.depth,
+        var depth = lambda.scope.depth + 1, scope = {
+            depth: depth,
             callee: lambda
         };
-        for (var i = scope.depth; i--;) {
-            scope['$' + i] = lambda.scope['$' + i]
-        }
-        return scope['$' + scope.depth] = scope;
+        scope['$' + depth] = scope;
+        while (depth--)
+            scope['$' + depth] = lambda.scope['$' + depth];
+        return scope;
     }
 
 }

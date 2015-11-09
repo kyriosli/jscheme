@@ -8,7 +8,16 @@
 ; supported literals
 ; 1 1.0 1e3 "foo"
 
+(define ch (. global "String" "fromCharCode"))
 
-(define op "add")
+(define add
+  (lambda (i current)
+    (if (eq? i 91)
+      current
+      (add (+ i 1) (+ current (ch i)))
+    )
+  )
+)
 
-((if (eq? op "add") + -) 4 3)
+
+(add 65 "")

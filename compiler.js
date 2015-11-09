@@ -6,7 +6,8 @@ var types = {
     QUOTE: 'quote',
     IDENTIFIER: 'identifier',
     STRING: 'string',
-    NUMBER: 'number'
+    NUMBER: 'number',
+    INTEGER: 'integer'
 };
 
 var assert = require('assert');
@@ -151,6 +152,10 @@ exports.generate = function (ast) {
         switch (expr.type) {
             case types.S_LIST:
                 return onSList(expr.exprs);
+            case types.INTEGER:
+                if (expr.value >= -1 && expr.value <= 24) {
+                    return ch(expr.value + 18)
+                }
             case types.NUMBER:
                 var str = expr.value + '';
                 if (str.length > expr.raw.length)
@@ -193,7 +198,8 @@ exports.generate = function (ast) {
             ret += onExpr(exprs[i]);
         }
         if (/^cv0[+\-*/&^%|=<>.]2/.test(ret)) {// shorthand
-            ret = '%' + ret[3] + ret.substr(5)
+            ret = '%' + ret[3] + ret.substr(5);
+            //if (ret[1] === '+')ret = ret.substr(1);
         }
         return ret;
     }
@@ -283,7 +289,7 @@ exports.parse = function (input, filename) {
             var num = Number(token);
             if (!isNaN(num)) {
                 return {
-                    type: types.NUMBER,
+                    type: (num | 0) === num ? types.INTEGER : types.NUMBER,
                     value: num,
                     raw: token,
                     pos: curr.pos
