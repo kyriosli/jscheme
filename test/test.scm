@@ -8,6 +8,28 @@
 ; supported literals
 ; 1 1.0 1e3 "foo"
 
+
+(define a undefined)
+(define b undefined)
+
+(set! a (lambda (x)
+    (if (eq? x 0) "even" (b (- x 1)))
+  )
+)
+
+(set! b (lambda (x)
+    (if (eq? x 0) "odd" (a (- x 1)))
+  )
+)
+
+(if (not (eq? (a 100000) "even")) (trace "failed"))
+(if (not (eq? (a 100001) "odd" )) (trace "failed"))
+
+(if (if 1 1 1) (if 1 0 0) (if 1 1 0))
+
+(if (not (eq? (+ 3 (if 1 4 5)) 7)) (trace "wrong"))
+
+
 (define ch (. global "String" "fromCharCode"))
 
 (define add

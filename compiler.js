@@ -29,7 +29,8 @@ exports.generate = function (ast) {
         '%': '%',
         '<': '<',
         '>': '>',
-        'eq?': '='
+        'eq?': '=',
+        'not': '!'
     };
 
     var currentScope = globals, variables = 0, scopes = [];
@@ -70,7 +71,7 @@ exports.generate = function (ast) {
             }
             var ret = '';
             for (var i = 2; i < arguments.length; i++) {
-                ret += onExpr(arguments[i]);
+                ret += onExpr(arguments[i], true);
             }
             currentScope = scopes.pop();
             variables = oldVars;
@@ -83,16 +84,20 @@ exports.generate = function (ast) {
                 throw 'ill-formed set!: one or two arguments is expected' + expr.pos;
             if (name.type !== types.IDENTIFIER)
                 throw 'ill-formed set!: an identifier is expected' + name.pos;
-            var arg = onExpr(name).substr(1);
-            if (arguments.length === 2) { // unset
-                var scopeIdx = num(arg),
-                    curr = scopeIdx === scopes.length ? currentScope : scopes[scopeIdx];
-                delete curr[arg[1]];
-                return 'r' + arg
+            var arg = onExpr(name).substr(1), isCurrent = arg.length === 1, isDelete = arguments.length === 2;
+            if (isDelete) {
+                if (isCurrent) {
+                    delete currentScope[arg];
+                    return 'p' + arg
+                } else {
+                    var scopeIdx = num(arg),
+                        curr = scopeIdx === scopes.length ? currentScope : scopes[scopeIdx];
+                    delete curr[arg[1]];
+                    return r + arg
+                }
             } else {
-                return 's' + arg + onExpr(val)
+                return (isCurrent ? 'q' : 't') + arg + onExpr(val)
             }
-
         },
         'trace': function (expr, subject) {
             if (arguments.length !== 2)
@@ -100,12 +105,13 @@ exports.generate = function (ast) {
             return 't' + onExpr(subject) + ch(expr.pos.length) + expr.pos;
         },
         'if': function (expr, cond, t, f) {
+            var lambda = expr.lambda;
             if (arguments.length === 2)
                 throw 'ill-formed if: condition is expected' + expr.pos;
             if (arguments.length < 3 || arguments.length > 4)
                 throw 'ill-formed if: one or two arguments is expected' + expr.pos;
-            var cond1 = onExpr(t), cond2 = arguments.length === 4 ? onExpr(f) : 'u';
-            return '?' + onExpr(cond) + ch(cond1.length + 3) + cond1 + 'k' + ch(cond2.length + 1) + cond2;
+            var cond1 = onExpr(t, lambda), cond2 = arguments.length === 4 ? onExpr(f, lambda) : 'u';
+            return (lambda ? '?' : '@') + onExpr(cond) + ch(cond2.length + 3) + cond2 + 'k' + ch(cond1.length + 1) + cond1;
         },
         'call': function (expr, target, callee) {
             if (arguments.length < 3)
@@ -137,21 +143,21 @@ exports.generate = function (ast) {
     };
 
     var exprs = ast.type === types.S_PROGRAM ? ast.exprs : [ast];
-    return ch(exprs.length) + onExprs(exprs);
+    return ch(exprs.length) + onExprs(exprs, true);
 
-    function onExprs(exprs) {
+    function onExprs(exprs, lambda) {
         var ret = '';
         for (var expr of exprs) {
-            ret += onExpr(expr);
+            ret += onExpr(expr, lambda);
         }
         return ret;
     }
 
-    function onExpr(expr) {
+    function onExpr(expr, lambda) {
         debug && console.log('onExpr', expr);
         switch (expr.type) {
             case types.S_LIST:
-                return onSList(expr.exprs);
+                return onSList(expr.exprs, lambda);
             case types.INTEGER:
                 if (expr.value >= -1 && expr.value <= 24) {
                     return ch(expr.value + 18)
@@ -166,6 +172,9 @@ exports.generate = function (ast) {
             case types.IDENTIFIER:
                 var name = expr.raw;
                 if (name in currentScope) { // determine which scope to use
+                    if (currentScope.hasOwnProperty(name)) {
+                        return 'w' + currentScope[name];
+                    }
                     var curr = currentScope, n = scopes.length;
                     while (!curr.hasOwnProperty(name)) curr = scopes[--n];
                     //console.log('name %s is variable %s in scope %d', name, curr[name], n);
@@ -181,7 +190,7 @@ exports.generate = function (ast) {
         }
     }
 
-    function onSList(exprs) {
+    function onSList(exprs, lambda) {
         if (exprs.length === 0) { // TODO an empty list
             return 'u';
         }
@@ -189,17 +198,17 @@ exports.generate = function (ast) {
         if (callee.type === types.IDENTIFIER) {
             var identifier = callee.raw;
             if (!(identifier in currentScope) && (identifier in keywords)) {
+                callee.lambda = lambda;
                 return keywords[identifier].apply(null, exprs)
             }
         }
         // a call
-        var ret = 'c' + onExpr(callee) + ch(exprs.length - 1);
+        var ret = (lambda ? 'b' : 'c') + onExpr(callee) + ch(exprs.length - 1);
         for (var i = 1; i < exprs.length; i++) {
             ret += onExpr(exprs[i]);
         }
         if (/^cv0[+\-*/&^%|=<>.]2/.test(ret)) {// shorthand
             ret = '%' + ret[3] + ret.substr(5);
-            //if (ret[1] === '+')ret = ret.substr(1);
         }
         return ret;
     }

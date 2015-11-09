@@ -1,6 +1,9 @@
-?  (if cond ok reverse)
+?  stmt if
+@  expr if
 $  string
-c  call
+
+b  stmt call
+c  expr call
 d  (define name val)
 
 i  (invoke method target ...args)
@@ -9,10 +12,14 @@ l  (lambda (names) val)
 m  method
 n  number
 o  integer
+
+p  (set! name) in current scope
+q  (set! name val) in current scope
 r  (set! name)
 s  (set! name val)
 t  (trace val)
 u  undefined
 v  variable
+w  variable in current scope
 
 A-Z: -1~24

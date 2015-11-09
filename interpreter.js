@@ -26,6 +26,8 @@ function run(code) {
             for (var i = 1; i < arguments.length; i++)
                 ret = ret[arguments[i]]
             return ret;
+        }, '!': function (ret) {
+            return !ret
         }
     };
     global.$0 = global;
@@ -46,75 +48,79 @@ function run(code) {
 
     return runner(code.substr(1), global, code.charCodeAt(0) - 48);
 
-
     function runner(code, scope, exprs) {
         var ret, pc = 0;
 
         while (exprs--) {
-            ret = onexpr(true);
+            ret = onexpr();
             //console.log('ins[' + exprs + ']: ' + String.fromCharCode(ins) + ' =>', ret);
         }
         return ret;
 
-        function onexpr(multiple) {
+        function onexpr() {
             var val, len, ret, arg, callee, i;
-            //console.log('ins[' + exprs + ']: ' + code[pc - 1] + ' pc=' + pc);
+
             switch (i = code.charCodeAt(pc++)) {
                 case 36: // string
                     return str();
-                case 37: // binary
+                case 37: // binary ### HOT ###
                     return binaries[code[pc++]](onexpr(), onexpr());
-                //case 43: // +
-                //    return onexpr() + onexpr();
-                case 63: // ?
-                    if (i = onexpr()) {
-                        pc++;
-                    } else {
+                case 63: // ? ### HOT ###
+                    if (onexpr()) {
                         pc += num();
-                    }
-                    if (multiple) {
-                        exprs++;
                     } else {
-                        val = onexpr();
-                        if (i) {
-                            pc++;
-                            pc += num();
-                        }
+                        pc++;
                     }
-                    return val;
-                case 99: // call
+                    exprs++;
+                    return;
+                case 64:
+                    if (onexpr()) { // true
+                        pc += num();
+                        return onexpr();
+                    } else { // false
+                        pc++;
+                        val = onexpr();
+                        pc++;
+                        pc += num();
+                        return val;
+                    }
+                case 99: // call ### HOT ###
+                case 98:
                     callee = onexpr();
                     arg = readList();
                     if (callee.apply) {
                         return callee.apply(null, arg)
-                    } else { // call lambda
-                        //console.log('>>> BEGIN call lambda', callee, args);
-                        ret = multiple && !exprs;
-                        if (ret && scope.callee === callee) { // scope reuse
-                            //console.log('scope reused', tailPC);
-                            val = scope;
-                        } else {
-                            val = mkScope(callee); // new scope
-                        }
-                        if ((len = callee.argc) > -1) {
-                            for (i = 0; i < len; i++) {
-                                val[i] = arg[i]
-                            }
-                        } else {
-                            val[0] = arg;
-                        }
-
-                        if (ret) { // tail call
-                            //console.log('>>> tail call optimized');
-                            code = callee.code;
-                            pc = 0;
-                            exprs = callee.exprs;
-                            scope = val;
-                            return
-                        }
-                        return runner(callee.code, val, callee.exprs);
-                        //console.log('<<< END call lambda', ret);
                     }
+                    // call lambda
+                    ret = i === 98 && !exprs;
+                    if (ret && scope.callee === callee) { // scope reuse
+                        //console.log('scope reused', tailPC);
+                        val = scope;
+                    } else {
+                        val = mkScope(callee); // new scope
+                    }
+                    if ((len = callee.argc) > -1) {
+                        for (i = 0; i < len; i++) {
+                            val[i] = arg[i]
+                        }
+                    } else {
+                        val[0] = arg;
+                    }
+
+                    if (ret) { // tail call
+                        //console.log('>>> tail call optimized');
+                        code = callee.code;
+                        exprs = callee.exprs;
+                        scope = val;
+                        pc = 0;
+                        return
+                    }
+                    return runner(callee.code, val, callee.exprs);
+
+                case 118: // variable ### HOT ###
+                    return scope['$' + num()][code[pc++]];
+                case 119: // current scope variable ### HOT ###
+                    return scope[code[pc++]];
                 case 100: // define
                     scope[code[pc++]] = onexpr();
                     //console.log('set', name, scope[name]);
@@ -137,20 +143,19 @@ function run(code) {
                 //console.log('lambda', ret, pc, exprs);
                 case 110: // number
                     return +str();
+                case 112:
+                case 113:
                 case 114: // remove
                 case 115: // set!
-                    val = scope['$' + num()]; // scope
+                    val = i & 2 ? scope['$' + num()] : scope; // scope
                     arg = code[pc++];
-                    ret = val[i];
+                    ret = val[arg];
                     if (i & 1) {
                         val[arg] = onexpr();
                     } else {
                         delete val[arg];
                     }
                     return ret;
-                case 118: // variable
-                    //console.log('variable %d:%s', code[pc], code[pc + 1]);
-                    return scope['$' + num()][code[pc++]];
                 case 122: // z
                     return null;
                 case 116: // trace
