@@ -75,7 +75,7 @@ exports.generate = function (ast) {
             variables = oldVars;
 
             //console.log('lambda args %d, exprs %d, code %s', argc, arguments.length - 2, ret);
-            return 'l' + ch(ret.length) + ch(argc) + ch(arguments.length - 2) + ret;
+            return 'l' + ch(argc) + ch(arguments.length - 2) + ch(ret.length) + ret;
         },
         'set!': function (expr, name, val) {
             if (arguments.length === 1 || arguments.length > 3)
@@ -122,7 +122,7 @@ exports.generate = function (ast) {
                 throw 'ill-formed call: target and method is expected' + expr.pos;
 
             var argc = arguments.length - 3;
-            var ret = 'i' + onExpr(target) + onExpr(method) + ch(argc);
+            var ret = 'i' + onExpr(method) + onExpr(target) + ch(argc);
             for (var i = 0; i < argc; i++) {
                 ret += onExpr(arguments[3 + i]);
             }
@@ -177,6 +177,9 @@ exports.generate = function (ast) {
     }
 
     function onSList(exprs) {
+        if (exprs.length === 0) { // TODO an empty list
+            return 'u';
+        }
         var callee = exprs[0];
         if (callee.type === types.IDENTIFIER) {
             var identifier = callee.raw;
@@ -185,12 +188,12 @@ exports.generate = function (ast) {
             }
         }
         // a call
-        var ret = 'c' + ch(exprs.length - 1);
-        for (var expr of exprs) {
-            ret += onExpr(expr);
+        var ret = 'c' + onExpr(callee) + ch(exprs.length - 1);
+        for (var i = 1; i < exprs.length; i++) {
+            ret += onExpr(exprs[i]);
         }
-        if (/^c2v0[+\-*/&^%|=<>.]/.test(ret)) {// shorthand
-            ret = '%' + ret.substr(4)
+        if (/^cv0[+\-*/&^%|=<>.]2/.test(ret)) {// shorthand
+            ret = '%' + ret[3] + ret.substr(5)
         }
         return ret;
     }

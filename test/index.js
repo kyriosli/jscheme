@@ -1,5 +1,7 @@
 process.chdir(__dirname);
 
+var assert = require('assert');
+
 var compiler = require('../compiler'),
     interpreter = require('../interpreter');
 
@@ -16,6 +18,7 @@ console.time('scm: sum(3e5)');
 var result = interpreter(code);
 console.timeEnd('scm: sum(3e5)');
 
+assert.strictEqual(result, result1);
 console.log('\x1b[36msum(3e5)\x1b[0m:', result, result1);
 
 // test fibnacci
@@ -31,6 +34,7 @@ console.time('scm: fib(23)');
 result = interpreter(code);
 console.timeEnd('scm: fib(23)');
 
+assert.strictEqual(result, result1);
 console.log('\x1b[36mfib(23)\x1b[0m:', result, result1);
 
 
@@ -49,7 +53,13 @@ console.time('scm: fib2(1e3)');
 result = interpreter(code);
 console.timeEnd('scm: fib2(1e3)');
 
+assert.strictEqual(result, result1);
 console.log('\x1b[36mfib2(1e3)\x1b[0m:', result, result1);
+
+code = compile('test.scm');
+result = interpreter(code);
+assert.strictEqual(result, 7);
+
 
 function compile(file) {
     var code = require('fs').readFileSync(file, 'utf8');

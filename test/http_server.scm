@@ -5,6 +5,7 @@
 (define server (
   (. (require "http") "createServer")
   (method (lambda (req res)
+    (log (. req "method") (. req "url") (. req "headers" "user-agent"))
     (invoke res (. res "end") "Hello world")
   ))
 ))

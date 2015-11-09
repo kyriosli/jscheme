@@ -9,4 +9,6 @@
 ; 1 1.0 1e3 "foo"
 
 
+(define op "add")
 
+((if (eq? op "add") + -) 4 3)
