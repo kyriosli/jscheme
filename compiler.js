@@ -305,7 +305,10 @@ exports.parse = function (input, filename) {
 
     function getExpr() {
         for (; ;) {
-            var curr = tokens[0], token = curr.token;
+            var curr = tokens[0];
+            if (!curr)
+                throw 'unexpected end of file';
+            var token = curr.token;
             if (!token || token === ')') {
                 return null;
             }

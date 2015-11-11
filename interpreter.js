@@ -31,20 +31,22 @@ var global_proto = {
     }
 };
 
-var binaries = {
-    '=': binary('==='),
-    '.': function (x, y) {
-        return x[y]
+var binaries = function () {
+    var buf = 'return {".":function(x,y){return x[y]}';
+
+    for (var i = 0, names = '+-*/&^%|<>'; i < names.length; i++) {
+        buf += binary(names[i], names[i]);
     }
-};
+    var map = {'=': '===', '(': '<<', ')': '>>', '}': '>>>'};
+    for (var k in map) {
+        buf += binary(k, map[k])
+    }
+    return Function(buf + '}')();
 
-for (var i = 0, names = '+-*/&^%|<>'; i < names.length; i++) {
-    binaries[names[i]] = binary(names[i]);
-}
-
-function binary(op) {
-    return Function('x,y', 'return x' + op + 'y')
-}
+    function binary(name, op) {
+        return ',"' + name + '":function(x,y){return x' + op + 'y}'
+    }
+}();
 
 function run(code) {
     var global = {__proto__: global_proto};
