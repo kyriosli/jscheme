@@ -154,16 +154,16 @@ function run(code) {
                     return +str();
                 case 112: // remove current
                 case 113: // set! current
-                case 114: // remove
-                case 115: // set!
-                    ret = i & 2 ?
-                        (val = onexpr())[arg = onexpr()] :
-                        (val = scope)[arg = code[pc++]];
+                    ret = scope[arg = code[pc++]];
                     if (i & 1) {
-                        val[arg] = onexpr();
+                        scope[arg] = onexpr();
                     } else {
-                        delete val[arg];
+                        delete scope[arg];
                     }
+                    return ret;
+                case 115: // set!
+                    ret = (val = onexpr())[arg = onexpr()];
+                    val[arg] = onexpr();
                     return ret;
                 case 122: // z
                     return null;

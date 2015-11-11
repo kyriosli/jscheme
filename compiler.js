@@ -43,8 +43,11 @@ exports.generate = function (ast) {
                 throw'ill-formed define: unexpected ' + name.type + name.pos;
             var arg = variables++,
                 argName = arg < 10 ? '' + arg : arg < 36 ? ch(arg + 23) : ch(arg + 29);
-
-            return 'd' + (currentScope[name.raw] = argName) + onExpr(val);
+            var tmp = currentScope[name.raw] = Object(argName);
+            tmp.defining = true;
+            val = onExpr(val); // in case of (define x x)
+            currentScope[name.raw] = argName;
+            return 'd' + argName + val;
         },
         'lambda': function (expr, argNames) {
             if (arguments.length < 3)
@@ -93,6 +96,8 @@ exports.generate = function (ast) {
                     } else {
                         return 'q' + arg + onExpr(val)
                     }
+                } else if (isDelete) {
+                    throw 'identifier ' + name.raw + ' not found in current scope' + name.pos
                 } else { // not current
                     var variable = arg[1]; // 0-9A-Fa-f
                     if (/^\d$/.test(variable)) { // 0-9 => B-K
@@ -103,14 +108,7 @@ exports.generate = function (ast) {
                         variable = '$1' + variable;
                     }
                     var ref = 'e' + arg[0] + variable;
-                    if (isDelete) {
-                        var scopeIdx = num(arg),
-                            scope = scopeIdx === scopes.length ? currentScope : scopes[scopeIdx];
-                        delete scope[arg[1]];
-                        return 'r' + ref
-                    } else {
-                        return 's' + ref + onExpr(val)
-                    }
+                    return 's' + ref + onExpr(val)
                 }
 
             } else if (name.type === types.S_LIST) {
@@ -211,19 +209,24 @@ exports.generate = function (ast) {
             case types.IDENTIFIER:
                 var name = expr.raw;
                 if (name in currentScope) { // determine which scope to use
-                    if (currentScope.hasOwnProperty(name)) {
+                    var isCurrent = currentScope.hasOwnProperty(name) && !currentScope[name].defining;
+                    var n = scopes.length;
+                    if (!isCurrent && n && name in scopes[n - 1]) {
+                        var curr = scopes[--n];
+                        while (!curr.hasOwnProperty(name)) curr = scopes[--n];
+                        //console.log('name %s is variable %s in scope %d', name, curr[name], n);
+                        return 'v' + ch(n) + curr[name];
+                    } else if (isCurrent) {
                         return 'w' + currentScope[name];
                     }
-                    var curr = currentScope, n = scopes.length;
-                    while (!curr.hasOwnProperty(name)) curr = scopes[--n];
-                    //console.log('name %s is variable %s in scope %d', name, curr[name], n);
-                    return 'v' + ch(n) + curr[name]
-                } else if (name === 'undefined') {
+                }
+
+                if (name === 'undefined') {
                     return 'u'
                 } else if (name === 'null') {
                     return 'z'
                 } else {
-                    throw 'unbound variable: ' + name + expr.pos
+                    throw 'undefined variable: ' + name + expr.pos
                 }
             //ret += 'c'+ch(expr.exprs.length-)
         }
@@ -246,8 +249,10 @@ exports.generate = function (ast) {
         for (var i = 1; i < exprs.length; i++) {
             ret += onExpr(exprs[i]);
         }
-        if (/^cv0[+\-*/&^%|=<>.]2/.test(ret)) {// shorthand
-            ret = '%' + ret[3] + ret.substr(5);
+
+        if (/^[bc](?:w|v0)[+\-*/&\^%|=<>.]2/.test(ret)) {// shorthand
+            var isGlobal = ret[1] === 'w';
+            ret = '%' + ret[isGlobal ? 2 : 3] + ret.substr(isGlobal ? 4 : 5);
         }
         return ret;
     }
