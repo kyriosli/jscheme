@@ -5,6 +5,7 @@ $  string
 b  stmt call
 c  expr call
 d  (define name val)
+e  (scope i)
 
 i  (invoke method target ...args)
 k  skip
@@ -15,8 +16,8 @@ o  integer
 
 p  (set! name) in current scope
 q  (set! name val) in current scope
-r  (set! name)
-s  (set! name val)
+r  (set! ref)
+s  (set! ref val)
 t  (trace val)
 u  undefined
 v  variable

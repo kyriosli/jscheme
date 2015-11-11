@@ -82,22 +82,50 @@ exports.generate = function (ast) {
         'set!': function (expr, name, val) {
             if (arguments.length === 1 || arguments.length > 3)
                 throw 'ill-formed set!: one or two arguments is expected' + expr.pos;
-            if (name.type !== types.IDENTIFIER)
-                throw 'ill-formed set!: an identifier is expected' + name.pos;
-            var arg = onExpr(name).substr(1), isCurrent = arg.length === 1, isDelete = arguments.length === 2;
-            if (isDelete) {
-                if (isCurrent) {
-                    delete currentScope[arg];
-                    return 'p' + arg
-                } else {
-                    var scopeIdx = num(arg),
-                        curr = scopeIdx === scopes.length ? currentScope : scopes[scopeIdx];
-                    delete curr[arg[1]];
-                    return r + arg
+            var isDelete = arguments.length === 2;
+            if (name.type === types.IDENTIFIER) {
+                var arg = onExpr(name), isCurrent = arg[0] === 'w';
+                arg = arg.substr(1);
+                if (isCurrent) { // is current
+                    if (isDelete) {
+                        delete currentScope[arg];
+                        return 'p' + arg
+                    } else {
+                        return 'q' + arg + onExpr(val)
+                    }
+                } else { // not current
+                    var variable = arg[1]; // 0-9A-Fa-f
+                    if (/^\d$/.test(variable)) { // 0-9 => B-K
+                        variable = ch(+variable + 18)
+                    } else if (/A-O/.test(variable)) { // 10~24
+                        variable = ch(num(variable) + 11);
+                    } else {
+                        variable = '$1' + variable;
+                    }
+                    var ref = 'e' + arg[0] + variable;
+                    if (isDelete) {
+                        var scopeIdx = num(arg),
+                            scope = scopeIdx === scopes.length ? currentScope : scopes[scopeIdx];
+                        delete scope[arg[1]];
+                        return 'r' + ref
+                    } else {
+                        return 's' + ref + onExpr(val)
+                    }
                 }
-            } else {
-                return (isCurrent ? 'q' : 't') + arg + onExpr(val)
+
+            } else if (name.type === types.S_LIST) {
+                var refCode = onExpr(name);
+                if (refCode[0] === '$') {
+                    refCode = refCode.substr(2);
+                    if (isDelete) {
+                        return 'r' + refCode
+                    } else {
+                        return 's' + refCode + onExpr(val)
+                    }
+                }
             }
+            throw 'ill-formed set!: an identifier or ref is expected' + name.pos;
+
         },
         'trace': function (expr, subject) {
             if (arguments.length !== 2)
@@ -139,6 +167,17 @@ exports.generate = function (ast) {
             if (arguments.length !== 2)
                 throw 'ill-formed method: one argument is expected' + expr.pos;
             return 'm' + onExpr(lambda)
+        },
+        'ref': function (expr, obj, key) {
+            if (arguments.length !== 3)
+                throw 'ill-formed ref: two arguments is expected' + expr.pos;
+
+            if (expr.lambda) {
+                return 'u';
+            }
+            // an expression
+            var ret = onExpr(obj) + onExpr(key);
+            return '$' + ch(ret.length) + ret
         }
     };
 
@@ -224,7 +263,7 @@ exports.generate = function (ast) {
 };
 
 exports.parse = function (input, filename) {
-    var reg = /^\s*(;.*?(?:\r?\n|$)|'|\(|\)|"(?:[^\r\n\t\\"]|\\[rnt0-7"'\\]|\\x[0-9a-fA-F]{2}|\\u[0-9a-fA-F]{4})*"|[^\s"\)]+|$)/;
+    var reg = /^\s*(;.*?(?:\r?\n|$)|'|\(|\)|"(?:[^\r\n\t\\"]|\\[rnt0-7"'\\]|\\x[0-9a-fA-F]{2}|\\u[0-9a-fA-F]{4})*"|[^\s"\(\)]+|$)/;
 
     var tokens = [];
     var remained = input;

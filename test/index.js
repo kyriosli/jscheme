@@ -73,8 +73,9 @@ assert.strictEqual(result, result1);
 console.log('\x1b[36mfib2(1e3)\x1b[0m:', result, result1);
 
 code = compile('test.scm');
-console.log('test.scm: ', code);
+console.log('test.scm: ', JSON.stringify(code));
 result = interpreter(code);
+assert.strictEqual(abc, 12345);
 assert.strictEqual(result, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
 
 

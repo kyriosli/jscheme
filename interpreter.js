@@ -1,55 +1,59 @@
 #!/usr/bin/env node
 
+var global_proto = {
+    depth: 0,
+    _: this,
+    "+": function (ret) {
+        ret = +ret;
+        for (var i = 1; i < arguments.length; i++)
+            ret += +arguments[i]
+        return ret;
+    }, '=': function (a, b) {
+        return a === b
+    }, '-': function (ret) {
+        for (var i = 1; i < arguments.length; i++)
+            ret -= arguments[i]
+        return ret;
+    }, '*': function (ret) {
+        for (var i = 1; i < arguments.length; i++)
+            ret *= arguments[i]
+        return ret;
+    }, '/': function (ret) {
+        for (var i = 1; i < arguments.length; i++)
+            ret /= arguments[i]
+        return ret;
+    }, '.': function (ret) {
+        for (var i = 1; i < arguments.length; i++)
+            ret = ret[arguments[i]]
+        return ret;
+    }, '!': function (ret) {
+        return !ret
+    }
+};
+
+var binaries = {
+    '=': binary('==='),
+    '.': function (x, y) {
+        return x[y]
+    }
+};
+
+for (var i = 0, names = '+-*/&^%|<>'; i < names.length; i++) {
+    binaries[names[i]] = binary(names[i]);
+}
+
+function binary(op) {
+    return Function('x,y', 'return x' + op + 'y')
+}
+
 function run(code) {
-    var global = {
-        _: this,
-        "+": function (ret) {
-            ret = +ret;
-            for (var i = 1; i < arguments.length; i++)
-                ret += +arguments[i]
-            return ret;
-        }, '=': function (a, b) {
-            return a === b
-        }, '-': function (ret) {
-            for (var i = 1; i < arguments.length; i++)
-                ret -= arguments[i]
-            return ret;
-        }, '*': function (ret) {
-            for (var i = 1; i < arguments.length; i++)
-                ret *= arguments[i]
-            return ret;
-        }, '/': function (ret) {
-            for (var i = 1; i < arguments.length; i++)
-                ret /= arguments[i]
-            return ret;
-        }, '.': function (ret) {
-            for (var i = 1; i < arguments.length; i++)
-                ret = ret[arguments[i]]
-            return ret;
-        }, '!': function (ret) {
-            return !ret
-        }
-    };
+    var global = {__proto__: global_proto};
+    global._ = this;
     global.$0 = global;
-    global.depth = 0;
-    var binaries = {
-        '=': binary('==='),
-        '.': function (x, y) {
-            return x[y]
-        }
-    };
-    for (var i = 0, names = '+-*/&^%|<>'; i < names.length; i++) {
-        binaries[names[i]] = binary(names[i]);
-    }
+    return runner(1, global, code.charCodeAt(0) - 48);
 
-    function binary(op) {
-        return Function('x,y', 'return x' + op + 'y')
-    }
-
-    return runner(code.substr(1), global, code.charCodeAt(0) - 48);
-
-    function runner(code, scope, exprs) {
-        var ret, pc = 0;
+    function runner(pc, scope, exprs) {
+        var ret;
 
         while (exprs--) {
             ret = onexpr();
@@ -109,22 +113,25 @@ function run(code) {
 
                     if (ret) { // tail call
                         //console.log('>>> tail call optimized');
-                        code = callee.code;
                         exprs = callee.exprs;
                         scope = val;
-                        pc = 0;
+                        pc = callee.pc;
                         return
                     }
-                    return runner(callee.code, val, callee.exprs);
+                    return runner(callee.pc, val, callee.exprs);
 
                 case 118: // variable ### HOT ###
                     return scope['$' + num()][code[pc++]];
                 case 119: // current scope variable ### HOT ###
                     return scope[code[pc++]];
+                case 61: // assign
+                    return onexpr()[onexpr()] = onexpr();
                 case 100: // define
                     scope[code[pc++]] = onexpr();
                     //console.log('set', name, scope[name]);
                     return;
+                case 101: // scope
+                    return scope['$' + code[pc++]];
                 case 105: // invoke: argc,...args,method,target
                     return onexpr().apply(onexpr(), readList());
                 case 107: // skip
@@ -132,24 +139,26 @@ function run(code) {
                     pc += num();
                     return;
                 case 108: // lambda
-                    return {
+                    ret = {
                         argc: num(),
                         exprs: num(),
-                        code: str(),
+                        pc: pc + 1,
                         scope: scope
                     };
+                    pc += num() + 1;
+                    return ret;
                 case 109: // method
                     return method(onexpr());
                 //console.log('lambda', ret, pc, exprs);
                 case 110: // number
                     return +str();
-                case 112:
-                case 113:
+                case 112: // remove current
+                case 113: // set! current
                 case 114: // remove
                 case 115: // set!
-                    val = i & 2 ? scope['$' + num()] : scope; // scope
-                    arg = code[pc++];
-                    ret = val[arg];
+                    ret = i & 2 ?
+                        (val = onexpr())[arg = onexpr()] :
+                        (val = scope)[arg = code[pc++]];
                     if (i & 1) {
                         val[arg] = onexpr();
                     } else {
@@ -192,7 +201,7 @@ function run(code) {
             for (var i = 0; i < lambda.argc; i++) {
                 scope[i] = arguments[i];
             }
-            return runner(lambda.code, scope, lambda.exprs)
+            return runner(lambda.pc, scope, lambda.exprs)
         };
     }
 

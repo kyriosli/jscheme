@@ -29,7 +29,6 @@
 
 (if (not (eq? (+ 3 (if 1 4 5)) 7)) (trace "wrong"))
 
-
 (define ch (. global "String" "fromCharCode"))
 
 (define add
@@ -41,5 +40,18 @@
   )
 )
 
+; test set! outer variable
+
+((lambda (x) (set! b x)) 1234)
+
+(if (not (eq? b 1234)) (trace "failed"))
+
+(set! (ref global "abc") 12345)
+
+(if (not (eq? (. global "abc") 12345)) (trace "failed"))
+
+(ref a b)
+
+(trace (ref "x" b))
 
 (add 65 "")
