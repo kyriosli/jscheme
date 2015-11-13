@@ -1,10 +1,15 @@
 ?  stmt if
 @  expr if
 $  string
-
+%  binary
+:  try: expr
+;  try: expr holder
+(  stmt begin
+)  expr begin
+*  new
+a  call obj key ...arg
 b  stmt call
 c  expr call
-d  (define name val)
 e  (scope i)
 
 i  (invoke method target ...args)

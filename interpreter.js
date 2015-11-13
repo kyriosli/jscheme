@@ -31,6 +31,8 @@ var global_proto = {
     }
 };
 
+var news = [], calls = [];
+
 var binaries = function () {
     var buf = 'return {".":function(x,y){return x[y]}';
 
@@ -126,12 +128,29 @@ function run(code) {
                     return scope['$' + num()][code[pc++]];
                 case 119: // current scope variable ### HOT ###
                     return scope[code[pc++]];
-                case 61: // assign
-                    return onexpr()[onexpr()] = onexpr();
-                case 100: // define
-                    scope[code[pc++]] = onexpr();
-                    //console.log('set', name, scope[name]);
-                    return;
+                // NOT HOT
+                case 40: // stmt begin
+                    return exprs += num();
+                case 41: // expr begin
+                    return readList().pop();
+                case 42: // new
+                    if (!(val = news[len = (i = readList()).length - 1])) {
+                        arg = 'e';
+                        while (len--) arg += ',e' + len;
+                        val = news[i.length - 1] = Function(arg, 'return new e(' + arg.substr(2) + ')')
+                    }
+                    return val.apply(null, i);
+                case 59: // try: expr holder
+                    arg = [code[pc++]];
+                case 58: // try: expr
+                    return tryCatch(i & 1, num() + pc, arg);
+                case 97: // call
+                    if (!(val = calls[len = (i = readList()).length - 2])) {
+                        arg = 'e,t';
+                        while (len--) arg += ',e' + len;
+                        val = calls[i.length - 2] = Function(arg, 'return e[t](' + arg.substr(4) + ')')
+                    }
+                    return val.apply(null, i);
                 case 101: // scope
                     return scope['$' + code[pc++]];
                 case 105: // invoke: argc,...args,method,target
@@ -157,11 +176,7 @@ function run(code) {
                 case 112: // remove current
                 case 113: // set! current
                     ret = scope[arg = code[pc++]];
-                    if (i & 1) {
-                        scope[arg] = onexpr();
-                    } else {
-                        delete scope[arg];
-                    }
+                    scope[arg] = i & 1 ? onexpr() : void 0;
                     return ret;
                 case 115: // set!
                     ret = (val = onexpr())[arg = onexpr()];
@@ -177,6 +192,21 @@ function run(code) {
                 default:
                     return i - 66;
             }
+        }
+
+        function tryCatch(i, len, arg) {
+            try {
+                var val = onexpr();
+                ret = true
+            } catch (e) {
+                pc = len; // fix right pc
+                val = e;
+                ret = false;
+            }
+            if (i) {
+                scope[arg] = val;
+            }
+            return ret;
         }
 
         function str() {

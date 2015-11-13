@@ -9,8 +9,8 @@
 ; 1 1.0 1e3 "foo"
 
 
-(define a undefined)
-(define b undefined)
+(define a)
+(define b)
 
 (set! a (lambda (x)
     (if (eq? x 0) "even" (b (- x 1)))
